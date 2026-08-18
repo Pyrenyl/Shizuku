@@ -88,6 +88,7 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
     private final ShizukuClientManager clientManager;
     private final ShizukuConfigManager configManager;
     private final int managerAppId;
+    private static volatile boolean blockNonPrimaryUserApps;
 
     public ShizukuService() {
         super();
@@ -111,6 +112,7 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
 
         configManager = getConfigManager();
         clientManager = getClientManager();
+        blockNonPrimaryUserApps = configManager.getBlockNonPrimaryUserApps();
 
         ApkChangedObservers.start(ai.sourceDir, () -> {
             if (getManagerApplicationInfo() == null) {
@@ -422,8 +424,12 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
         List<PackageInfo> list = new ArrayList<>();
         List<Integer> users = new ArrayList<>();
         if (userId == -1) {
-            users.addAll(UserManagerApis.getUserIdsNoThrow());
-        } else {
+            if (blockNonPrimaryUserApps) {
+                users.add(0);
+            } else {
+                users.addAll(UserManagerApis.getUserIdsNoThrow());
+            }
+        } else if (!isUserBlocked(userId)) {
             users.add(userId);
         }
 
@@ -455,15 +461,60 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
         return new ParcelableListSlice<>(list);
     }
 
+    private static boolean isUserBlocked(int userId) {
+        return blockNonPrimaryUserApps && userId != 0;
+    }
+
+    private void enforcePrimaryUserManagerPermission(String func) {
+        enforceManagerPermission(func);
+        if (UserHandleCompat.getUserId(Binder.getCallingUid()) != 0) {
+            throw new SecurityException(func + " is allowed only from the manager in user 0");
+        }
+    }
+
+    private void setBlockNonPrimaryUserApps(boolean value) throws RemoteException {
+        if (blockNonPrimaryUserApps == value) return;
+
+        List<Integer> uids = new ArrayList<>();
+        if (value) {
+            for (PackageInfo pi : getApplications(-1).getList()) {
+                int uid = pi.applicationInfo.uid;
+                if (UserHandleCompat.getUserId(uid) != 0 && !uids.contains(uid)) {
+                    uids.add(uid);
+                }
+            }
+        }
+
+        blockNonPrimaryUserApps = value;
+        configManager.setBlockNonPrimaryUserApps(value);
+
+        for (int uid : uids) {
+            updateFlagsForUid(uid, ConfigManager.MASK_PERMISSION, 0);
+        }
+    }
+
     @Override
     public boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
         //LOGGER.d("transact: code=%d, calling uid=%d", code, Binder.getCallingUid());
         if (code == ServerConstants.BINDER_TRANSACTION_getApplications) {
             data.enforceInterface(ShizukuApiConstants.BINDER_DESCRIPTOR);
+            enforceManagerPermission("getApplications");
             int userId = data.readInt();
             ParcelableListSlice<PackageInfo> result = getApplications(userId);
             reply.writeNoException();
             result.writeToParcel(reply, android.os.Parcelable.PARCELABLE_WRITE_RETURN_VALUE);
+            return true;
+        } else if (code == ServerConstants.BINDER_TRANSACTION_getBlockNonPrimaryUserApps) {
+            data.enforceInterface(ShizukuApiConstants.BINDER_DESCRIPTOR);
+            enforcePrimaryUserManagerPermission("getBlockNonPrimaryUserApps");
+            reply.writeNoException();
+            reply.writeInt(blockNonPrimaryUserApps ? 1 : 0);
+            return true;
+        } else if (code == ServerConstants.BINDER_TRANSACTION_setBlockNonPrimaryUserApps) {
+            data.enforceInterface(ShizukuApiConstants.BINDER_DESCRIPTOR);
+            enforcePrimaryUserManagerPermission("setBlockNonPrimaryUserApps");
+            setBlockNonPrimaryUserApps(data.readInt() != 0);
+            reply.writeNoException();
             return true;
         }
         return super.onTransact(code, data, reply, flags);
@@ -509,6 +560,8 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
     }
 
     static void sendBinderToUserApp(Binder binder, String packageName, int userId, boolean retry) {
+        if (isUserBlocked(userId)) return;
+
         try {
             DeviceIdleControllerApis.addPowerSaveTempWhitelistApp(packageName, 30 * 1000, userId,
                     316/* PowerExemptionManager#REASON_SHELL */, "shell");

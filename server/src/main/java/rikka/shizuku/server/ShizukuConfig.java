@@ -17,6 +17,9 @@ public class ShizukuConfig {
     @SerializedName("packages")
     public List<PackageEntry> packages = new ArrayList<>();
 
+    @SerializedName("block_non_primary_user_apps")
+    public boolean blockNonPrimaryUserApps;
+
     public static class PackageEntry extends ConfigPackageEntry {
 
         @SerializedName("uid")

@@ -12,6 +12,16 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/home_app_management_title">
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:key="block_non_primary_user_apps"
+            android:persistent="false"
+            android:summary="@string/settings_block_non_primary_user_apps_summary"
+            android:title="@string/settings_block_non_primary_user_apps" />
+
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/settings_language">
 
         <rikka.preference.SimpleMenuPreference

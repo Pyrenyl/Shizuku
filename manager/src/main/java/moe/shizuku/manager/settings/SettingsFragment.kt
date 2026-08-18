@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.os.UserManager
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.LayoutInflater
@@ -18,6 +19,7 @@ import moe.shizuku.manager.ShizukuSettings.KEEP_START_ON_BOOT
 import moe.shizuku.manager.app.ThemeHelper
 import moe.shizuku.manager.app.ThemeHelper.KEY_BLACK_NIGHT_THEME
 import moe.shizuku.manager.app.ThemeHelper.KEY_USE_SYSTEM_COLOR
+import moe.shizuku.manager.authorization.AuthorizationManager
 import moe.shizuku.manager.ktx.isComponentEnabled
 import moe.shizuku.manager.ktx.setComponentEnabled
 import moe.shizuku.manager.ktx.toHtml
@@ -27,6 +29,7 @@ import rikka.core.util.ResourceUtils
 import rikka.material.app.LocaleDelegate
 import rikka.recyclerview.addEdgeSpacing
 import rikka.recyclerview.fixEdgeEffect
+import rikka.shizuku.Shizuku
 import rikka.shizuku.manager.ShizukuLocales
 import rikka.widget.borderview.BorderRecyclerView
 import java.util.*
@@ -38,6 +41,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private lateinit var languagePreference: ListPreference
     private lateinit var nightModePreference: IntegerSimpleMenuPreference
     private lateinit var blackNightThemePreference: TwoStatePreference
+    private lateinit var blockNonPrimaryUserAppsPreference: TwoStatePreference
     private lateinit var startOnBootPreference: TwoStatePreference
     private lateinit var startupPreference: PreferenceCategory
     private lateinit var translationPreference: Preference
@@ -55,11 +59,33 @@ class SettingsFragment : PreferenceFragmentCompat() {
         languagePreference = findPreference(KEY_LANGUAGE)!!
         nightModePreference = findPreference(KEY_NIGHT_MODE)!!
         blackNightThemePreference = findPreference(KEY_BLACK_NIGHT_THEME)!!
+        blockNonPrimaryUserAppsPreference = findPreference("block_non_primary_user_apps")!!
         startOnBootPreference = findPreference(KEEP_START_ON_BOOT)!!
         startupPreference = findPreference("startup")!!
         translationPreference = findPreference("translation")!!
         translationContributorsPreference = findPreference("translation_contributors")!!
         useSystemColorPreference = findPreference(KEY_USE_SYSTEM_COLOR)!!
+
+        if (context.getSystemService(UserManager::class.java).isSystemUser) {
+            blockNonPrimaryUserAppsPreference.isEnabled = Shizuku.pingBinder()
+            if (blockNonPrimaryUserAppsPreference.isEnabled) {
+                runCatching {
+                    blockNonPrimaryUserAppsPreference.isChecked = AuthorizationManager.getBlockNonPrimaryUserApps()
+                }.onFailure {
+                    blockNonPrimaryUserAppsPreference.isEnabled = false
+                }
+            }
+            blockNonPrimaryUserAppsPreference.onPreferenceChangeListener =
+                Preference.OnPreferenceChangeListener { _, value ->
+                    if (value !is Boolean) return@OnPreferenceChangeListener false
+                    runCatching {
+                        AuthorizationManager.setBlockNonPrimaryUserApps(value)
+                        true
+                    }.getOrDefault(false)
+                }
+        } else {
+            blockNonPrimaryUserAppsPreference.isVisible = false
+        }
 
         val componentName = ComponentName(context.packageName, BootCompleteReceiver::class.java.name)
 

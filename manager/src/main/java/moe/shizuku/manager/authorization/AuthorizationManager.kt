@@ -18,6 +18,34 @@ object AuthorizationManager {
     private const val FLAG_DENIED = 1 shl 2
     private const val MASK_PERMISSION = FLAG_ALLOWED or FLAG_DENIED
 
+    fun getBlockNonPrimaryUserApps(): Boolean {
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken("moe.shizuku.server.IShizukuService")
+            Shizuku.getBinder()!!.transact(ServerConstants.BINDER_TRANSACTION_getBlockNonPrimaryUserApps, data, reply, 0)
+            reply.readException()
+            reply.readInt() != 0
+        } finally {
+            reply.recycle()
+            data.recycle()
+        }
+    }
+
+    fun setBlockNonPrimaryUserApps(value: Boolean) {
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        try {
+            data.writeInterfaceToken("moe.shizuku.server.IShizukuService")
+            data.writeInt(if (value) 1 else 0)
+            Shizuku.getBinder()!!.transact(ServerConstants.BINDER_TRANSACTION_setBlockNonPrimaryUserApps, data, reply, 0)
+            reply.readException()
+        } finally {
+            reply.recycle()
+            data.recycle()
+        }
+    }
+
     private fun getApplications(userId: Int): List<PackageInfo> {
         val data = Parcel.obtain()
         val reply = Parcel.obtain()

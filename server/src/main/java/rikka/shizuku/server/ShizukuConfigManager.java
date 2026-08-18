@@ -235,6 +235,20 @@ public class ShizukuConfigManager extends ConfigManager {
         }
     }
 
+    public boolean getBlockNonPrimaryUserApps() {
+        synchronized (this) {
+            return config.blockNonPrimaryUserApps;
+        }
+    }
+
+    public void setBlockNonPrimaryUserApps(boolean value) {
+        synchronized (this) {
+            if (config.blockNonPrimaryUserApps == value) return;
+            config.blockNonPrimaryUserApps = value;
+            scheduleWriteLocked();
+        }
+    }
+
     private void removeLocked(int uid) {
         ShizukuConfig.PackageEntry entry = findLocked(uid);
         if (entry == null) {

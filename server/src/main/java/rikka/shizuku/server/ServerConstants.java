@@ -9,4 +9,6 @@ public class ServerConstants {
     public static final String REQUEST_PERMISSION_ACTION = MANAGER_APPLICATION_ID + ".intent.action.REQUEST_PERMISSION";
 
     public static final int BINDER_TRANSACTION_getApplications = 10001;
+    public static final int BINDER_TRANSACTION_getBlockNonPrimaryUserApps = 10002;
+    public static final int BINDER_TRANSACTION_setBlockNonPrimaryUserApps = 10003;
 }
