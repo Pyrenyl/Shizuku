@@ -11,4 +11,6 @@ public class ServerConstants {
     public static final int BINDER_TRANSACTION_getApplications = 10001;
     public static final int BINDER_TRANSACTION_getBlockNonPrimaryUserApps = 10002;
     public static final int BINDER_TRANSACTION_setBlockNonPrimaryUserApps = 10003;
+    public static final int BINDER_TRANSACTION_getRequireAuthentication = 10004;
+    public static final int BINDER_TRANSACTION_setRequireAuthentication = 10005;
 }

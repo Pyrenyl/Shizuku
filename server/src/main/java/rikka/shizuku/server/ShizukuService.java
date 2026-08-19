@@ -516,6 +516,18 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
             setBlockNonPrimaryUserApps(data.readInt() != 0);
             reply.writeNoException();
             return true;
+        } else if (code == ServerConstants.BINDER_TRANSACTION_getRequireAuthentication) {
+            data.enforceInterface(ShizukuApiConstants.BINDER_DESCRIPTOR);
+            enforceManagerPermission("getRequireAuthentication");
+            reply.writeNoException();
+            reply.writeInt(configManager.getRequireAuthentication() ? 1 : 0);
+            return true;
+        } else if (code == ServerConstants.BINDER_TRANSACTION_setRequireAuthentication) {
+            data.enforceInterface(ShizukuApiConstants.BINDER_DESCRIPTOR);
+            enforcePrimaryUserManagerPermission("setRequireAuthentication");
+            configManager.setRequireAuthentication(data.readInt() != 0);
+            reply.writeNoException();
+            return true;
         }
         return super.onTransact(code, data, reply, flags);
     }

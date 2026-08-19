@@ -7,12 +7,17 @@ import android.os.Bundle
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import moe.shizuku.manager.Helps
 import moe.shizuku.manager.R
 import moe.shizuku.manager.app.AppActivity
 import moe.shizuku.manager.databinding.ConfirmationDialogBinding
 import moe.shizuku.manager.ktx.toHtml
+import moe.shizuku.manager.utils.DeviceAuthentication
 import moe.shizuku.manager.utils.Logger.LOGGER
 import rikka.core.res.resolveColor
 import rikka.html.text.HtmlCompat
@@ -22,11 +27,12 @@ import rikka.shizuku.ShizukuApiConstants.REQUEST_PERMISSION_REPLY_IS_ONETIME
 import rikka.shizuku.server.ktx.workerHandler
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 class RequestPermissionActivity : AppActivity() {
 
     private lateinit var dialog: Dialog
+    private lateinit var authentication: DeviceAuthentication
+    private var authenticating = false
 
     private fun setResult(requestUid: Int, requestPid: Int, requestCode: Int, allowed: Boolean, onetime: Boolean) {
         val data = Bundle()
@@ -66,22 +72,16 @@ class RequestPermissionActivity : AppActivity() {
     private fun waitForBinder(): Boolean {
         val countDownLatch = CountDownLatch(1)
 
-        val listener = object : Shizuku.OnBinderReceivedListener {
-            override fun onBinderReceived() {
-                countDownLatch.countDown()
-                Shizuku.removeBinderReceivedListener(this)
-            }
-        }
+        val listener = Shizuku.OnBinderReceivedListener { countDownLatch.countDown() }
 
         Shizuku.addBinderReceivedListenerSticky(listener, workerHandler)
 
-        return try {
-            countDownLatch.await(5, TimeUnit.SECONDS)
-            true
-        } catch (e: TimeoutException) {
-            LOGGER.e(e, "Binder not received in 5s")
-            false
+        val received = countDownLatch.await(5, TimeUnit.SECONDS)
+        Shizuku.removeBinderReceivedListener(listener)
+        if (!received) {
+            LOGGER.e("Binder not received in 5s")
         }
+        return received
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,8 +113,24 @@ class RequestPermissionActivity : AppActivity() {
 
         val binding = ConfirmationDialogBinding.inflate(layoutInflater).apply {
             button1.setOnClickListener {
-                setResult(uid, pid, requestCode, allowed = true, onetime = false)
-                dialog.dismiss()
+                if (authenticating) return@setOnClickListener
+                authenticating = true
+                lifecycleScope.launch {
+                    val authenticationRequired = withContext(Dispatchers.IO) {
+                        runCatching { AuthorizationManager.getRequireAuthentication() }.getOrNull()
+                    }
+                    when (authenticationRequired) {
+                        null -> {
+                            setResult(uid, pid, requestCode, allowed = false, onetime = true)
+                            dialog.dismiss()
+                        }
+                        false -> {
+                            setResult(uid, pid, requestCode, allowed = true, onetime = false)
+                            dialog.dismiss()
+                        }
+                        true -> authentication.authenticate(getString(R.string.authentication_grant_title))
+                    }
+                }
             }
             button3.setOnClickListener {
                 setResult(uid, pid, requestCode, allowed = false, onetime = true)
@@ -123,6 +139,16 @@ class RequestPermissionActivity : AppActivity() {
             title.text = HtmlCompat.fromHtml(getString(R.string.permission_warning_template,
                     label, getString(R.string.permission_group_description)))
         }
+
+        authentication = DeviceAuthentication(
+            this,
+            onSuccess = {
+                authenticating = false
+                setResult(uid, pid, requestCode, allowed = true, onetime = false)
+                dialog.dismiss()
+            },
+            onError = { authenticating = false },
+        )
 
         dialog = MaterialAlertDialogBuilder(this)
                 .setView(binding.root)

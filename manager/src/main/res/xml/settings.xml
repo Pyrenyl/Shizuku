@@ -12,7 +12,16 @@
 
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="@string/home_app_management_title">
+    <PreferenceCategory
+        android:key="security"
+        android:title="@string/settings_security">
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="false"
+            android:key="require_authentication"
+            android:persistent="false"
+            android:summary="@string/settings_require_authentication_summary"
+            android:title="@string/settings_require_authentication" />
 
         <rikka.material.preference.MaterialSwitchPreference
             android:key="block_non_primary_user_apps"

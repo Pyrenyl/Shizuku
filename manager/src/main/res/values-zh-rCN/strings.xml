@@ -86,6 +86,12 @@
     <string name="settings_start_on_boot">开机启动（root）</string>
     <string name="settings_block_non_primary_user_apps">阻止非主用户应用</string>
     <string name="settings_block_non_primary_user_apps_summary">禁止非主用户中的应用连接或请求 Shizuku</string>
+    <string name="settings_security">安全</string>
+    <string name="settings_require_authentication">要求身份验证</string>
+    <string name="settings_require_authentication_summary">进入应用管理或进行授权操作时，需要验证身份</string>
+    <string name="authentication_unlock_title">解锁 Shizuku</string>
+    <string name="authentication_grant_title">确认授权</string>
+    <string name="authentication_screen_lock_required">请先设置设备屏幕锁</string>
     <string name="permission_warning_template"><![CDATA[要允许<b>%1$s</b>%2$s吗？]]></string>
     <string name="grant_dialog_button_allow_always">始终允许</string>
     <string name="grant_dialog_button_deny">拒绝</string>

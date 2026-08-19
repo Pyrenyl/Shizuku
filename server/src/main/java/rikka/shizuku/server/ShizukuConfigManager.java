@@ -249,6 +249,20 @@ public class ShizukuConfigManager extends ConfigManager {
         }
     }
 
+    public boolean getRequireAuthentication() {
+        synchronized (this) {
+            return config.requireAuthentication;
+        }
+    }
+
+    public void setRequireAuthentication(boolean value) {
+        synchronized (this) {
+            if (config.requireAuthentication == value) return;
+            config.requireAuthentication = value;
+            scheduleWriteLocked();
+        }
+    }
+
     private void removeLocked(int uid) {
         ShizukuConfig.PackageEntry entry = findLocked(uid);
         if (entry == null) {

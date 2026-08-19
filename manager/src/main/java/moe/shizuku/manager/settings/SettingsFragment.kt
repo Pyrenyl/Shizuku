@@ -10,6 +10,7 @@ import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.preference.*
 import androidx.recyclerview.widget.RecyclerView
@@ -25,6 +26,7 @@ import moe.shizuku.manager.ktx.setComponentEnabled
 import moe.shizuku.manager.ktx.toHtml
 import moe.shizuku.manager.receiver.BootCompleteReceiver
 import moe.shizuku.manager.utils.CustomTabsHelper
+import moe.shizuku.manager.utils.DeviceAuthentication
 import rikka.core.util.ResourceUtils
 import rikka.material.app.LocaleDelegate
 import rikka.recyclerview.addEdgeSpacing
@@ -42,11 +44,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private lateinit var nightModePreference: IntegerSimpleMenuPreference
     private lateinit var blackNightThemePreference: TwoStatePreference
     private lateinit var blockNonPrimaryUserAppsPreference: TwoStatePreference
+    private lateinit var requireAuthenticationPreference: TwoStatePreference
     private lateinit var startOnBootPreference: TwoStatePreference
     private lateinit var startupPreference: PreferenceCategory
     private lateinit var translationPreference: Preference
     private lateinit var translationContributorsPreference: Preference
     private lateinit var useSystemColorPreference: TwoStatePreference
+    private lateinit var authentication: DeviceAuthentication
+    private var disablingAuthentication = false
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val context = requireContext()
@@ -60,13 +65,29 @@ class SettingsFragment : PreferenceFragmentCompat() {
         nightModePreference = findPreference(KEY_NIGHT_MODE)!!
         blackNightThemePreference = findPreference(KEY_BLACK_NIGHT_THEME)!!
         blockNonPrimaryUserAppsPreference = findPreference("block_non_primary_user_apps")!!
+        requireAuthenticationPreference = findPreference("require_authentication")!!
         startOnBootPreference = findPreference(KEEP_START_ON_BOOT)!!
         startupPreference = findPreference("startup")!!
         translationPreference = findPreference("translation")!!
         translationContributorsPreference = findPreference("translation_contributors")!!
         useSystemColorPreference = findPreference(KEY_USE_SYSTEM_COLOR)!!
 
-        if (context.getSystemService(UserManager::class.java).isSystemUser) {
+        val isSystemUser = context.getSystemService(UserManager::class.java).isSystemUser
+        findPreference<PreferenceCategory>("security")!!.isVisible = isSystemUser
+        if (isSystemUser) {
+            authentication = DeviceAuthentication(
+                requireActivity(),
+                onSuccess = {
+                    disablingAuthentication = false
+                    runCatching {
+                        AuthorizationManager.setRequireAuthentication(false)
+                    }.onSuccess {
+                        requireAuthenticationPreference.isChecked = false
+                    }
+                },
+                onError = { disablingAuthentication = false },
+            )
+
             blockNonPrimaryUserAppsPreference.isEnabled = Shizuku.pingBinder()
             if (blockNonPrimaryUserAppsPreference.isEnabled) {
                 runCatching {
@@ -83,8 +104,35 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         true
                     }.getOrDefault(false)
                 }
-        } else {
-            blockNonPrimaryUserAppsPreference.isVisible = false
+
+            requireAuthenticationPreference.isEnabled = Shizuku.pingBinder()
+            if (requireAuthenticationPreference.isEnabled) {
+                runCatching {
+                    requireAuthenticationPreference.isChecked = AuthorizationManager.getRequireAuthentication()
+                }.onFailure {
+                    requireAuthenticationPreference.isEnabled = false
+                }
+            }
+            requireAuthenticationPreference.onPreferenceChangeListener =
+                Preference.OnPreferenceChangeListener { _, value ->
+                    if (value !is Boolean) return@OnPreferenceChangeListener false
+                    if (!value) {
+                        if (!disablingAuthentication) {
+                            disablingAuthentication = true
+                            authentication.authenticate(getString(R.string.authentication_unlock_title))
+                        }
+                        return@OnPreferenceChangeListener false
+                    }
+
+                    if (!DeviceAuthentication.isAvailable(context)) {
+                        Toast.makeText(context, R.string.authentication_screen_lock_required, Toast.LENGTH_LONG).show()
+                        return@OnPreferenceChangeListener false
+                    }
+                    runCatching {
+                        AuthorizationManager.setRequireAuthentication(true)
+                        true
+                    }.getOrDefault(false)
+                }
         }
 
         val componentName = ComponentName(context.packageName, BootCompleteReceiver::class.java.name)

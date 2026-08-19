@@ -1,6 +1,6 @@
 [submodule "api"]
 	path = api
-	url = git@github.com:RikkaApps/Shizuku-API.git
+	url = https://github.com/Pyrenyl/Shizuku-API.git
 	branch = master
 [submodule "hidden-api"]
 	path = hidden-api

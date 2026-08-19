@@ -20,6 +20,9 @@ public class ShizukuConfig {
     @SerializedName("block_non_primary_user_apps")
     public boolean blockNonPrimaryUserApps;
 
+    @SerializedName("require_authentication")
+    public boolean requireAuthentication;
+
     public static class PackageEntry extends ConfigPackageEntry {
 
         @SerializedName("uid")
