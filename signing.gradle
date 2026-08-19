@@ -1,17 +1,25 @@
-def ksFile = rootProject.file('signing.properties')
-def props = new Properties()
-if (ksFile.canRead()) {
-    props.load(new FileInputStream(ksFile))
+def releaseSigning = [
+        storeFile    : providers.environmentVariable('RELEASE_STORE_FILE').orNull,
+        storePassword: providers.environmentVariable('RELEASE_STORE_PASSWORD').orNull,
+        keyAlias     : providers.environmentVariable('RELEASE_KEY_ALIAS').orNull,
+        keyPassword  : providers.environmentVariable('RELEASE_KEY_PASSWORD').orNull,
+]
 
-    if (props != null) {
-        android.signingConfigs.sign.storeFile file(props['KEYSTORE_FILE'])
-        android.signingConfigs.sign.storePassword props['KEYSTORE_PASSWORD']
-        android.signingConfigs.sign.keyAlias props['KEYSTORE_ALIAS']
-        android.signingConfigs.sign.keyPassword props['KEYSTORE_ALIAS_PASSWORD']
+android.signingConfigs.sign {
+    storeFile = releaseSigning.storeFile ? file(releaseSigning.storeFile) : null
+    storePassword = releaseSigning.storePassword
+    keyAlias = releaseSigning.keyAlias
+    keyPassword = releaseSigning.keyPassword
+}
+
+android.buildTypes.debug.signingConfig = android.signingConfigs.debug
+
+afterEvaluate {
+    tasks.named('preReleaseBuild') {
+        doFirst {
+            if (releaseSigning.values().any { !it }) {
+                throw new GradleException('Missing release signing environment')
+            }
+        }
     }
-} else {
-    android.signingConfigs.sign.storeFile = android.signingConfigs.debug.storeFile
-    android.signingConfigs.sign.storePassword = android.signingConfigs.debug.storePassword
-    android.signingConfigs.sign.keyAlias = android.signingConfigs.debug.keyAlias
-    android.signingConfigs.sign.keyPassword = android.signingConfigs.debug.keyPassword
 }

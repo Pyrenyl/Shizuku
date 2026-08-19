@@ -27,6 +27,11 @@
     <methods>;
 }
 
+# FingerprintManager was removed from the API 37 SDK, but is referenced by AndroidX Biometric on older devices.
+-dontwarn android.hardware.fingerprint.FingerprintManager
+-dontwarn android.hardware.fingerprint.FingerprintManager$AuthenticationCallback
+-dontwarn android.hardware.fingerprint.FingerprintManager$CryptoObject
+
 # Entrance of Shizuku service
 -keep class rikka.shizuku.server.ShizukuService {
     public static void main(java.lang.String[]);
